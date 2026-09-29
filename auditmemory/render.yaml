@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: auditmemory
+    runtime: docker
+    plan: free
+    envVars:
+      - key: HINDSIGHT_API_KEY
+        sync: false
+      - key: HINDSIGHT_BASE_URL
+        value: https://api.hindsight.vectorize.io
+      - key: GROQ_API_KEY
+        sync: false

@@ -1,0 +1,41 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>AuditMemory</title>
+<style>
+:root{--bg:#EDF1F4;--ink:#14222E;--mut:#5B6B79;--card:#fff;--line:#D3DBE2;--ok:#0F766E;--med:#B45309;--high:#C2410C;--crit:#991B1B;--low:#64748B}
+*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--ink)}
+main{max-width:560px;margin:0 auto;padding:16px}h1{font-size:22px;margin:8px 0 2px}p.sub{margin:0 0 14px;color:var(--mut);font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+input,textarea{width:100%;font:inherit;padding:10px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px}
+textarea{min-height:120px}button{font:inherit;border:0;border-radius:8px;padding:11px 14px;background:var(--ink);color:#fff;width:100%}
+button.s{background:#fff;color:var(--ink);border:1px solid var(--line);width:auto;padding:6px 10px;font-size:13px;margin:0 6px 6px 0}
+.f{border-left:5px solid var(--low)}.f.critical{border-color:var(--crit)}.f.high{border-color:var(--high)}.f.medium{border-color:var(--med)}
+.tag{font-size:12px;font-weight:700}.mem{margin-top:6px;padding:8px;background:#E6F4F1;border-radius:6px;font-size:14px;color:#0B4F49}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.badge{font-size:12px;color:var(--mut)}
+</style></head><body><main>
+<h1>AuditMemory</h1><p class="sub">Legal Metrology label checks that remember every audit. <span id="mode" class="badge"></span></p>
+<div class="card">
+<input id="v" placeholder="Vendor" value="Sunrise Foods">
+<input id="p" placeholder="Product" value="Masala Chips 100g">
+<textarea id="t" placeholder="Paste label text"></textarea>
+<div><button class="s" onclick="ex(1)">Sample: missing MRP + address</button><button class="s" onclick="ex(2)">Sample: compliant</button></div>
+<button onclick="run()">Check label</button></div>
+<div id="out"></div><div id="hist"></div></main>
+<script>
+const $=i=>document.getElementById(i);
+const S={1:"Masala Chips. Net Wt 100 g. Pkd Sep 2026. Customer care 1800-123-456",2:"Masala Chips. MRP Rs. 20 incl. all taxes. Net Wt 100 g. Mfg 09/2026. Manufactured by Sunrise Foods Pvt Ltd, Hyderabad 500001. Customer care 1800-123-456"};
+const ex=n=>$("t").value=S[n];
+const post=(u,b)=>fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)}).then(r=>r.json());
+async function run(){
+ if(!$("t").value.trim())return $("out").innerHTML='<div class="card">Paste label text or pick a sample first.</div>';
+ const r=await post("/api/check",{vendor:$("v").value,product:$("p").value,label_text:$("t").value});
+ $("mode").textContent="memory: "+r.memory_mode+" · "+r.history_count+" past records";
+ $("out").innerHTML='<div class="card"><b>'+r.summary+'</b></div>'+(r.findings.length?"":'<div class="card">Compliant. Nothing to flag.</div>')+
+ r.findings.map(f=>`<div class="card f ${f.severity}"><span class="tag">${f.severity}</span><div>${f.title}</div>
+ ${f.memory_note?`<div class="mem">${f.memory_note}</div>`:""}
+ <div class="row"><button class="s" onclick="fb('${f.rule}','confirmed',this)">Confirm</button><button class="s" onclick="fb('${f.rule}','false_positive',this)">False positive</button></div></div>`).join("");
+ hist();
+}
+async function fb(rule,verdict,el){await post("/api/feedback",{vendor:$("v").value,rule,verdict});el.textContent="Saved";}
+async function hist(){const r=await fetch("/api/history?vendor="+encodeURIComponent($("v").value)).then(r=>r.json());
+ $("hist").innerHTML='<div class="card"><b>Vendor memory</b>'+r.items.slice(-12).map(i=>`<div class="badge">${i}</div>`).join("")+'</div>';}
+</script></body></html>
