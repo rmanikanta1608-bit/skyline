@@ -17,6 +17,9 @@ button.s{background:#fff;color:var(--ink);border:1px solid var(--line);width:aut
 <input id="v" placeholder="Vendor" value="Sunrise Foods">
 <input id="p" placeholder="Product" value="Masala Chips 100g">
 <textarea id="t" placeholder="Paste label text"></textarea>
+<input id="img" type="file" accept="image/*" capture="environment" hidden onchange="up(this)">
+<button class="s" onclick="$('img').click()">Upload label photo</button>
+<div id="ocrs" class="badge"></div>
 <div><button class="s" onclick="ex(1)">Sample: missing MRP + address</button><button class="s" onclick="ex(2)">Sample: compliant</button></div>
 <button onclick="run()">Check label</button></div>
 <div id="out"></div><div id="hist"></div></main>
@@ -24,6 +27,11 @@ button.s{background:#fff;color:var(--ink);border:1px solid var(--line);width:aut
 const $=i=>document.getElementById(i);
 const S={1:"Masala Chips. Net Wt 100 g. Pkd Sep 2026. Customer care 1800-123-456",2:"Masala Chips. MRP Rs. 20 incl. all taxes. Net Wt 100 g. Mfg 09/2026. Manufactured by Sunrise Foods Pvt Ltd, Hyderabad 500001. Customer care 1800-123-456"};
 const ex=n=>$("t").value=S[n];
+function shrink(f){return new Promise(res=>{const im=new Image();im.onload=()=>{const k=Math.min(1,1400/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=im.width*k;c.height=im.height*k;c.getContext("2d").drawImage(im,0,0,c.width,c.height);res(c.toDataURL("image/jpeg",.85))};im.src=URL.createObjectURL(f)})}
+async function up(el){const f=el.files[0];if(!f)return;$("ocrs").textContent="Reading label...";
+ const r=await post("/api/ocr",{image:await shrink(f)});
+ if(r.error||!r.text){$("ocrs").textContent=r.error||"No text found. Try a clearer photo.";return}
+ $("t").value=r.text;$("ocrs").textContent="Label read. Edit the text if needed, then check.";run()}
 const post=(u,b)=>fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)}).then(r=>r.json());
 async function run(){
  if(!$("t").value.trim())return $("out").innerHTML='<div class="card">Paste label text or pick a sample first.</div>';
