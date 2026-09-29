@@ -65,6 +65,23 @@ def check(c: Check):
     return {"findings": out, "summary": narrate(c.vendor, out, snips), "memory_mode": memory.mode(),
             "history_count": len(snips)}
 
+class Img(BaseModel):
+    image: str  # data URL
+
+@app.post("/api/ocr")
+def ocr(i: Img):
+    """Read label text from a photo using a Groq vision model."""
+    if not os.getenv("GROQ_API_KEY"):
+        return {"text": "", "error": "GROQ_API_KEY is not set on the server."}
+    try:
+        from groq import Groq
+        r = Groq().chat.completions.create(model="meta-llama/llama-4-scout-17b-16e-instruct", messages=[{"role": "user", "content": [
+            {"type": "text", "text": "Transcribe all text on this product label exactly as printed (English and any other language). Output only the text."},
+            {"type": "image_url", "image_url": {"url": i.image}}]}])
+        return {"text": r.choices[0].message.content.strip()}
+    except Exception as e:
+        return {"text": "", "error": f"Could not read the image: {e}"}
+
 @app.post("/api/feedback")
 def feedback(f: Feedback):
     memory.retain(f"VENDOR={f.vendor} RULE={f.rule} STATUS={f.verdict} NOTE={f.note}", context="officer feedback")
