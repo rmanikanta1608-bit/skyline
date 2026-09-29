@@ -1,4 +1,4 @@
-import os, json
+import os, json, re
 from dotenv import load_dotenv
 load_dotenv()
 from fastapi import FastAPI
@@ -73,14 +73,19 @@ def ocr(i: Img):
     """Read label text from a photo using a Groq vision model."""
     if not os.getenv("GROQ_API_KEY"):
         return {"text": "", "error": "GROQ_API_KEY is not set on the server."}
-    try:
-        from groq import Groq
-        r = Groq().chat.completions.create(model="meta-llama/llama-4-scout-17b-16e-instruct", messages=[{"role": "user", "content": [
-            {"type": "text", "text": "Transcribe all text on this product label exactly as printed (English and any other language). Output only the text."},
-            {"type": "image_url", "image_url": {"url": i.image}}]}])
-        return {"text": r.choices[0].message.content.strip()}
-    except Exception as e:
-        return {"text": "", "error": f"Could not read the image: {e}"}
+    from groq import Groq
+    models = [x for x in [os.getenv("VISION_MODEL"), "qwen/qwen3.6-27b", "qwen/qwen3.8-27b"] if x]
+    err = ""
+    for model in models:
+        try:
+            r = Groq().chat.completions.create(model=model, messages=[{"role": "user", "content": [
+                {"type": "text", "text": "Transcribe all text on this product label exactly as printed. Output only the text, no commentary."},
+                {"type": "image_url", "image_url": {"url": i.image}}]}])
+            t = re.sub(r"<think>.*?</think>", "", r.choices[0].message.content or "", flags=re.S).strip()
+            if t: return {"text": t}
+        except Exception as e:
+            err = str(e)
+    return {"text": "", "error": f"Could not read the image: {err}"}
 
 @app.post("/api/feedback")
 def feedback(f: Feedback):
